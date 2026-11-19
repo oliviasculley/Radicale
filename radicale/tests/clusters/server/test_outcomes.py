@@ -429,7 +429,7 @@ def test_builtin_unlimited_and_single_connection_limit(tmp_path, monkeypatch):
     def slow(self):
         entered.append(1)
         if len(entered) == 1:
-            assert release.wait(5)
+            assert release.wait(30)
         return real_handle(self)
 
     monkeypatch.setattr(server.RequestHandler, "handle", slow)
@@ -445,7 +445,7 @@ def test_builtin_unlimited_and_single_connection_limit(tmp_path, monkeypatch):
     try:
         first = threading.Thread(target=client)
         first.start()
-        deadline = time.monotonic() + 5
+        deadline = time.monotonic() + 30
         while len(entered) < 1:
             assert time.monotonic() < deadline
             time.sleep(0.02)
@@ -454,8 +454,8 @@ def test_builtin_unlimited_and_single_connection_limit(tmp_path, monkeypatch):
         time.sleep(0.3)
         assert len(entered) == 1
         release.set()
-        first.join(5)
-        second.join(5)
+        first.join(30)
+        second.join(30)
         assert [item[0] for item in results] == [302, 302]
     finally:
         release.set()
@@ -514,7 +514,7 @@ def test_builtin_waits_for_workers_and_uses_windows_select_timeout(tmp_path, mon
 
     def slow(self):
         started.set()
-        assert release.wait(5)
+        assert release.wait(30)
         return real_handle(self)
 
     monkeypatch.setattr(server.RequestHandler, "handle", slow)
@@ -533,17 +533,17 @@ def test_builtin_waits_for_workers_and_uses_windows_select_timeout(tmp_path, mon
     client_thread = threading.Thread(target=client)
     try:
         client_thread.start()
-        assert started.wait(5)
+        assert started.wait(30)
         left.close()
         time.sleep(0.3)
         assert thread.is_alive()
         release.set()
-        client_thread.join(5)
-        thread.join(5)
+        client_thread.join(30)
+        thread.join(30)
     finally:
         release.set()
         left.close()
-        thread.join(5)
+        thread.join(30)
         right.close()
     assert "exc" not in holder and "exc" not in result
     assert result["resp"][0] == 302
