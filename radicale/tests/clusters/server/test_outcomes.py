@@ -533,7 +533,12 @@ def test_builtin_waits_for_workers_and_uses_windows_select_timeout(tmp_path, mon
     client_thread = threading.Thread(target=client)
     try:
         client_thread.start()
-        assert started.wait(30)
+        # Poll. On macOS a worker thread's getaddrinfo does not finish
+        # while this thread is blocked inside Event.wait.
+        deadline = time.monotonic() + 30
+        while not started.is_set():
+            assert time.monotonic() < deadline
+            time.sleep(0.02)
         left.close()
         time.sleep(0.3)
         assert thread.is_alive()
