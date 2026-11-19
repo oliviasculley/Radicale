@@ -1,30 +1,53 @@
-# Radicale
+# calex
 
-[![Test](https://github.com/Kozea/Radicale/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/Kozea/Radicale/actions/workflows/test.yml)
-[![Coverage Status](https://coveralls.io/repos/github/Kozea/Radicale/badge.svg?branch=master)](https://coveralls.io/github/Kozea/Radicale?branch=master)
+calex is a CalDAV and CardDAV server. People sign up, confirm their email, and turn on two-factor authentication in the website. Calendar and address-book clients connect with HTTP Basic using the same email and password. Collections and sharing are created in the web UI and stored in Postgres.
 
-Radicale is a small but powerful CalDAV (calendars, to-do lists) and CardDAV
-(contacts) server, that:
+SMTP, registration, and the hostname come from environment variables. calex does not read an INI file, an htpasswd file, or a rights file.
 
-* Shares calendars and contact lists through CalDAV, CardDAV and HTTP.
-* Supports events, todos, journal entries and business cards.
-* Works out-of-the-box, no complicated setup or configuration required.
-* Can limit access by authentication.
-* Can secure connections with TLS.
-* Works with many CalDAV and CardDAV clients
-* Stores all data on the file system in a simple folder structure.
-* Can be extended with plugins.
-* Is GPLv3-licensed free software.
+## Environment
 
-For the complete documentation, please visit
-[Radicale master Documentation](https://radicale.org/master.html).
+| Variable | Purpose |
+| --- | --- |
+| `HOST` | Public hostname, such as `calex.example.com`. Required outside the test environment. |
+| `DATABASE_URL` | Postgres URL. Defaults to `ecto://postgres:postgres@127.0.0.1/calex_dev`. |
+| `SECRET_KEY_BASE` | Phoenix secret. Required in production. Generate with `priv/random.sh`. |
+| `CLOAK_KEY` | 32 random bytes, base64. Required in production. Generate with `priv/cloak_key.sh`. |
+| `REGISTRATION` | `invite` (default) or `public`. The first account is an admin either way. |
+| `DISABLE_EMAIL` | `true` or `1` runs without sending mail and confirms accounts immediately. |
+| `SMTP_HOST` | SMTP relay. Set together with the username and password, or leave all three unset. |
+| `SMTP_PORT` | SMTP port. Defaults to `587`. |
+| `SMTP_USERNAME` | SMTP username. |
+| `SMTP_PASSWORD` | SMTP password. |
+| `SMTP_SSL` | `true` turns on implicit TLS. |
+| `EMAIL_FROM` | From address. Defaults to `no-reply@$HOST`. |
+| `EMAIL_NAME` | From name. Defaults to `calex`. |
+| `PORT` | HTTP port inside the server. Defaults to `4000`. |
 
-How the source tree is put together is in [docs/README.md](docs/README.md).
+A partial SMTP setup refuses to boot unless `DISABLE_EMAIL` is `true` or `1`. In production, leaving `SMTP_HOST`, `SMTP_USERNAME`, and `SMTP_PASSWORD` unset also disables outgoing mail.
 
-Additional hints can be found
-* [Radicale Wiki](https://github.com/Kozea/Radicale/wiki)
-* [Radicale Issues](https://github.com/Kozea/Radicale/issues)
-* [Radicale Discussions](https://github.com/Kozea/Radicale/discussions)
+## Clients
 
-Before reporting an issue, please check
-* [Radicale Wiki / Reporting Issues](https://github.com/Kozea/Radicale/wiki/01-‐-Reporting-Issues)
+`/.well-known/caldav` and `/.well-known/carddav` redirect to `/dav/`. A signed-in owner creates calendars and address books in the website, or a client creates them with `MKCALENDAR` and `MKCOL`. The owner grants another account read, write, or free-busy-only. The next request from that account follows the grant. Free-busy returns busy periods without event details.
+
+## Running
+
+```sh
+docker compose -f docker-compose.yml up
+```
+
+The image is `shibaobun/calex`. Set `HOST`, `SECRET_KEY_BASE`, and `CLOAK_KEY` before serving it on a public hostname.
+
+## Development
+
+```sh
+mix setup
+mix phx.server
+```
+
+`HOST` must be set. `mix test` uses the test defaults.
+
+## License
+
+The current tree is free software under the GNU Affero General Public License, version 3 or any later version. See `LICENSE.md`.
+
+History through the Radicale commits is GPL-3.0, copyright Kozea and the Radicale contributors. This tree is a clean-room Phoenix rewrite and does not include Radicale's Python. Account, mail, and two-factor behavior follows the AGPL-3.0-or-later apps this project shares that code with. GPLv3 section 13 allows that combination, so the project license is AGPL-3.0-or-later rather than GPL-3.0 only.

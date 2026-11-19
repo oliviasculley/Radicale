@@ -1,0 +1,8 @@
+_build
+deps
+.git
+.local
+data
+cover
+erl_crash.dump
+tmp

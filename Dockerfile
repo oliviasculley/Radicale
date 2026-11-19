@@ -1,32 +1,41 @@
-# This file is intended to be used apart from the containing source code tree.
+FROM hexpm/elixir:1.20.5-erlang-29.1.2-alpine-3.24.3 AS build
 
-FROM python:3-alpine AS builder
-
-# Version of Radicale (e.g. v3)
-ARG VERSION=master
-
-# Optional dependencies (e.g. bcrypt or ldap)
-ARG DEPENDENCIES=bcrypt,h2
-
-RUN apk add --no-cache --virtual .build-deps gcc libffi-dev musl-dev rust cargo \
-    && python -m venv /app/venv \
-    && /app/venv/bin/pip install --no-cache-dir "Radicale[${DEPENDENCIES}] @ https://github.com/Kozea/Radicale/archive/${VERSION}.tar.gz"
-
-
-FROM python:3-alpine
+RUN apk add --no-cache build-base git
 
 WORKDIR /app
 
-RUN addgroup -g 1000 radicale \
-    && adduser radicale --home /var/lib/radicale --system --uid 1000 --disabled-password -G radicale \
-    && apk add --no-cache ca-certificates openssl curl git openssh-client apache2-utils
+RUN mix local.hex --force 2.6.0 && \
+    mix local.rebar rebar3 https://github.com/erlang/rebar3/releases/download/3.28.0/rebar3 --force --sha512 33bbd38c624f179a507ea0db611217aa3e9d99b6e65a96cdaebd933224e73af271c4d348171698f69c907dcf4f246757c8ea925a4153048bfdb6c7c5ca0835cf
 
-COPY --chown=radicale:radicale --from=builder /app/venv /app
+ENV MIX_ENV=prod
 
-# Persistent storage for data
-VOLUME /var/lib/radicale
-# Run Radicale
-ENTRYPOINT [ "/app/bin/python", "/app/bin/radicale"]
-CMD ["--hosts", "0.0.0.0:5232,[::]:5232"]
+COPY mix.exs mix.lock ./
+COPY config config
+RUN mix deps.get --only prod && mix deps.compile
 
-USER radicale
+COPY lib lib
+COPY priv priv
+COPY assets assets
+COPY rel rel
+RUN mix do compile, assets.deploy, release
+
+FROM alpine:3.22 AS app
+
+RUN apk upgrade --no-cache && \
+    apk add --no-cache bash ca-certificates openssl libssl3 libcrypto3 libgcc libstdc++ ncurses-libs
+
+WORKDIR /app
+
+RUN chown nobody:nobody /app
+
+ENV MIX_ENV=prod \
+    PHX_SERVER=true \
+    HOME=/app
+
+USER nobody:nobody
+
+COPY --from=build --chown=nobody:nobody /app/_build/prod/rel/calex ./
+COPY --from=build --chown=nobody:nobody /app/priv /app/priv
+RUN chmod +x /app/priv/random.sh /app/priv/cloak_key.sh
+
+CMD ["bin/calex", "start"]
