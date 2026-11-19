@@ -31,8 +31,12 @@ from radicale import pathutils
 class TestPathToFilesystem:
     """Tests for path_to_filesystem function."""
 
-    @pytest.mark.filterwarnings("error::ResourceWarning")
+    @pytest.mark.filterwarnings(
+        "ignore:.*\\.py' mode='rb'.*:pytest.PytestUnraisableExceptionWarning")
+    @pytest.mark.filterwarnings(
+        "ignore:.*\\.py' mode='rb'.*:ResourceWarning")
     @pytest.mark.filterwarnings("error::pytest.PytestUnraisableExceptionWarning")
+    @pytest.mark.filterwarnings("error::ResourceWarning")
     def test_scandir_iterator_closed(self) -> None:
         """Verify that os.scandir iterator is properly closed.
 
@@ -44,6 +48,11 @@ class TestPathToFilesystem:
         unclosed scandir iterator is finalized. We use pytest.mark.filterwarnings
         to convert both ResourceWarning and PytestUnraisableExceptionWarning
         to errors.
+
+        PyPy finalizes an importer FileIO for ``radicale/app/__init__.py``
+        during this collection when another test in the same xdist worker
+        imported the package. That file is not the scandir iterator, so it
+        stays a warning.
         """
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a subdirectory so path_to_filesystem has something
