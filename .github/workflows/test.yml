@@ -58,7 +58,7 @@ jobs:
         run: pip install tox
       - name: Test with newest Python on latest Ubuntu
         # tox env py uses -n 4, the vCPU count of this ubuntu-26.04 runner.
-        # The filesystem jobs stay serial.
+        # The filesystem jobs stay serial. Matrix jobs use this same py env.
         run: tox -c pyproject.toml -e py
 
   test-ubuntu-python-newest-with-passlib:
