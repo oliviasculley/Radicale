@@ -132,7 +132,13 @@ def pytest_configure(config: pytest.Config) -> None:
     config._radicale_overlap_port = _start_gate()  # type: ignore[attr-defined]
 
 
+@pytest.hookimpl(optionalhook=True)
 def pytest_configure_node(node: Any) -> None:
+    """Pass the overlap port to xdist workers.
+
+    The hook is optional so sessions that do not install pytest-xdist,
+    such as the CalDAV compatibility job, still load this module.
+    """
     port = getattr(node.config, "_radicale_overlap_port", None)
     if port is not None:
         node.workerinput["radicale_overlap_port"] = str(port)
