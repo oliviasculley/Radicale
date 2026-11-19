@@ -19,6 +19,8 @@
 The session gate replies ``together`` only after both cases have
 connected and are waiting. One case running alone never gets that
 reply. The timeout only stops a sequential session from hanging.
+The root conftest places these two cases first on two workers when
+``--maxschedchunk=1``.
 """
 
 import asyncio
