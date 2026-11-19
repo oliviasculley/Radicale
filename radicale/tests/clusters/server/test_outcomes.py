@@ -524,17 +524,25 @@ def test_builtin_waits_for_workers_and_uses_windows_select_timeout(tmp_path, mon
         lambda: server.serve(_bind_server(tmp_path / "workers", port), right))
     sock = None
     try:
-        # Connect here. On the macOS runner a worker thread's getaddrinfo
-        # does not finish, so a client thread never reaches the handler.
+        # Connect here, with the same helper the other builtin tests use.
+        # A worker thread's getaddrinfo does not finish on the macOS runner.
+        # A one-second timeout also aborts the handshake on Python 3.12 there
+        # while the server is already listening.
         deadline = time.monotonic() + 30
         last_error = None
-        while sock is None and time.monotonic() < deadline:
+        conn = None
+        while conn is None and time.monotonic() < deadline:
             try:
-                sock = socket.create_connection(("127.0.0.1", port), timeout=1)
+                candidate = http.client.HTTPConnection(
+                    "127.0.0.1", port, timeout=5)
+                candidate.connect()
+                conn = candidate
             except OSError as exc:
                 last_error = exc
-                time.sleep(0.02)
-        assert sock is not None, "builtin server did not accept: %s" % last_error
+                time.sleep(0.05)
+        assert conn is not None, "builtin server did not accept: %s" % last_error
+        sock = conn.sock
+        assert sock is not None
         sock.sendall(b"GET / HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
         deadline = time.monotonic() + 30
         while not started.is_set() and time.monotonic() < deadline:
