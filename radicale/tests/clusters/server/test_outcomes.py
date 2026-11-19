@@ -520,38 +520,47 @@ def test_builtin_waits_for_workers_and_uses_windows_select_timeout(tmp_path, mon
     monkeypatch.setattr(server.RequestHandler, "handle", slow)
     port = _free_port()
     left, right = socket.socketpair()
-    result = {}
-
-    def client():
-        try:
-            result["resp"] = _http_get(port)
-        except BaseException as exc:  # noqa: BLE001
-            result["exc"] = exc
-
     thread, holder = _thread_result(
         lambda: server.serve(_bind_server(tmp_path / "workers", port), right))
-    client_thread = threading.Thread(target=client)
+    sock = None
     try:
-        client_thread.start()
-        # Poll. On macOS a worker thread's getaddrinfo does not finish
-        # while this thread is blocked inside Event.wait.
+        # Connect here. On the macOS runner a worker thread's getaddrinfo
+        # does not finish, so a client thread never reaches the handler.
         deadline = time.monotonic() + 30
-        while not started.is_set():
-            assert time.monotonic() < deadline
+        last_error = None
+        while sock is None and time.monotonic() < deadline:
+            try:
+                sock = socket.create_connection(("127.0.0.1", port), timeout=1)
+            except OSError as exc:
+                last_error = exc
+                time.sleep(0.02)
+        assert sock is not None, "builtin server did not accept: %s" % last_error
+        sock.sendall(b"GET / HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+        deadline = time.monotonic() + 30
+        while not started.is_set() and time.monotonic() < deadline:
             time.sleep(0.02)
+        assert started.is_set(), "builtin handler did not start"
         left.close()
         time.sleep(0.3)
         assert thread.is_alive()
         release.set()
-        client_thread.join(30)
-        thread.join(30)
+        sock.settimeout(30)
+        chunks = []
+        while True:
+            chunk = sock.recv(4096)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        status = int(b"".join(chunks).split(b" ", 2)[1])
     finally:
         release.set()
         left.close()
         thread.join(30)
         right.close()
-    assert "exc" not in holder and "exc" not in result
-    assert result["resp"][0] == 302
+        if sock is not None:
+            sock.close()
+    assert "exc" not in holder
+    assert status == 302
     monkeypatch.undo()
 
     timeouts = []
