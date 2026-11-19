@@ -27,7 +27,7 @@ A partial SMTP setup refuses to boot unless `DISABLE_EMAIL` is `true` or `1`. In
 
 ## Clients
 
-`/.well-known/caldav` and `/.well-known/carddav` redirect to `/dav/`. A signed-in owner creates calendars and address books in the website, or a client creates them with `MKCALENDAR` and `MKCOL`. The owner grants another account read, write, or free-busy-only. The next request from that account follows the grant. Free-busy returns busy periods without event details.
+`/.well-known/caldav` and `/.well-known/carddav` redirect to `/dav/`. A signed-in owner creates calendars and address books in the website, or a client creates them with `MKCALENDAR` and `MKCOL`. Clients put, get, list, and delete events, todos, journals, and vCards. `calendar-query` (including a time range), `calendar-multiget`, `addressbook-query`, `addressbook-multiget`, and `sync-collection` return the stored items. The owner grants another account read, write, or free-busy-only. The next request from that account follows the grant. Free-busy returns busy periods without event details.
 
 ## Running
 

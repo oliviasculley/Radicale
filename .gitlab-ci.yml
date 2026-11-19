@@ -30,9 +30,12 @@ variables:
 test:
   stage: test
   interruptible: true
+  # elixir:1.20.5-otp-29
   image: hexpm/elixir:1.20.5-erlang-29.1.2-alpine-3.24.3
   services:
     - postgres:17
+  rules:
+    - when: on_success
   cache:
     key:
       files:

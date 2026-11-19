@@ -89,8 +89,10 @@ defmodule CalexWeb.DavTest do
     </C:calendar-multiget>
     """
 
-    assert response(dav(user, "REPORT", calendar_home(user) <> "work/", multiget), 207) =~
-             "Todo One"
+    multiget_body = response(dav(user, "REPORT", calendar_home(user) <> "work/", multiget), 207)
+    assert multiget_body =~ "Todo One"
+    refute multiget_body =~ "Event One"
+    refute multiget_body =~ "Journal One"
 
     query = """
     <CARD:addressbook-query xmlns:D="DAV:" xmlns:CARD="urn:ietf:params:xml:ns:carddav">
@@ -101,8 +103,8 @@ defmodule CalexWeb.DavTest do
     </CARD:addressbook-query>
     """
 
-    assert response(dav(user, "REPORT", address_home(user) <> "people/", query), 207) =~
-             "Ada Lovelace"
+    query_body = response(dav(user, "REPORT", address_home(user) <> "people/", query), 207)
+    assert query_body =~ "Ada Lovelace"
 
     card_multiget = """
     <CARD:addressbook-multiget xmlns:D="DAV:" xmlns:CARD="urn:ietf:params:xml:ns:carddav">
@@ -111,13 +113,100 @@ defmodule CalexWeb.DavTest do
     </CARD:addressbook-multiget>
     """
 
-    assert response(dav(user, "REPORT", address_home(user) <> "people/", card_multiget), 207) =~
-             "Ada Lovelace"
+    card_body = response(dav(user, "REPORT", address_home(user) <> "people/", card_multiget), 207)
+    assert card_body =~ "Ada Lovelace"
 
     for {path, _body} <- items do
       assert response(dav(user, "DELETE", path), 204)
       assert response(dav(user, "GET", path), 404)
     end
+  end
+
+  test "calendar-multiget returns the requested item and not the others" do
+    user = user_fixture()
+    collection = calendar_home(user) <> "work/"
+    assert response(dav(user, "MKCALENDAR", collection), 201)
+
+    assert response(
+             dav(
+               user,
+               "PUT",
+               collection <> "event.ics",
+               vevent("event-1", "Event One", "20260301T090000Z", "20260301T100000Z")
+             ),
+             201
+           )
+
+    assert response(dav(user, "PUT", collection <> "todo.ics", vtodo("todo-1", "Todo One")), 201)
+
+    report = """
+    <C:calendar-multiget xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+      <D:prop><D:getetag/><C:calendar-data/></D:prop>
+      <D:href>#{collection}todo.ics</D:href>
+    </C:calendar-multiget>
+    """
+
+    body = response(dav(user, "REPORT", collection, report), 207)
+    assert body =~ "Todo One"
+    assert body =~ "UID:todo-1"
+    refute body =~ "Event One"
+  end
+
+  test "addressbook-query returns cards that match and excludes the rest" do
+    user = user_fixture()
+    collection = address_home(user) <> "people/"
+    assert response(dav(user, "MKCOL", collection, "<CARD:addressbook/>"), 201)
+
+    assert response(
+             dav(user, "PUT", collection <> "ada.vcf", vcard("card-1", "Ada Lovelace")),
+             201
+           )
+
+    assert response(
+             dav(user, "PUT", collection <> "grace.vcf", vcard("card-2", "Grace Hopper")),
+             201
+           )
+
+    report = """
+    <CARD:addressbook-query xmlns:D="DAV:" xmlns:CARD="urn:ietf:params:xml:ns:carddav">
+      <D:prop><CARD:address-data/></D:prop>
+      <CARD:filter>
+        <CARD:prop-filter name="FN"><CARD:text-match>Ada</CARD:text-match></CARD:prop-filter>
+      </CARD:filter>
+    </CARD:addressbook-query>
+    """
+
+    body = response(dav(user, "REPORT", collection, report), 207)
+    assert body =~ "Ada Lovelace"
+    refute body =~ "Grace Hopper"
+  end
+
+  test "addressbook-multiget returns the requested card and not the others" do
+    user = user_fixture()
+    collection = address_home(user) <> "people/"
+    assert response(dav(user, "MKCOL", collection, "<CARD:addressbook/>"), 201)
+
+    assert response(
+             dav(user, "PUT", collection <> "ada.vcf", vcard("card-1", "Ada Lovelace")),
+             201
+           )
+
+    assert response(
+             dav(user, "PUT", collection <> "grace.vcf", vcard("card-2", "Grace Hopper")),
+             201
+           )
+
+    report = """
+    <CARD:addressbook-multiget xmlns:D="DAV:" xmlns:CARD="urn:ietf:params:xml:ns:carddav">
+      <D:prop><CARD:address-data/></D:prop>
+      <D:href>#{collection}grace.vcf</D:href>
+    </CARD:addressbook-multiget>
+    """
+
+    body = response(dav(user, "REPORT", collection, report), 207)
+    assert body =~ "Grace Hopper"
+    assert body =~ "UID:card-2"
+    refute body =~ "Ada Lovelace"
   end
 
   test "calendar-query time range includes one event and excludes another" do
@@ -259,7 +348,6 @@ defmodule CalexWeb.DavTest do
     VERSION:3.0
     UID:#{uid}
     FN:#{name}
-    N:Lovelace;Ada;;;
     END:VCARD
     """
   end
