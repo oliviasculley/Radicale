@@ -57,6 +57,7 @@ jobs:
       - name: Install Test dependencies
         run: pip install tox
       - name: Test with newest Python on latest Ubuntu
+        # tox env py uses -n 4, the vCPU count of this ubuntu-26.04 runner.
         run: tox -c pyproject.toml -e py
 
   test-ubuntu-python-newest-with-passlib:
