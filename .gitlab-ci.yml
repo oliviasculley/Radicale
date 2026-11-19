@@ -50,7 +50,7 @@ test:
     - mix local.rebar rebar3 https://github.com/erlang/rebar3/releases/download/3.28.0/rebar3 --force --sha512 33bbd38c624f179a507ea0db611217aa3e9d99b6e65a96cdaebd933224e73af271c4d348171698f69c907dcf4f246757c8ea925a4153048bfdb6c7c5ca0835cf
     - mix deps.get
   script:
-    - mix test
+    - mix test.all
 
 .publish:
   stage: publish
